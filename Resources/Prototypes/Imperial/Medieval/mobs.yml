@@ -4213,8 +4213,6 @@
     layers:
     - map: [ "enum.DamageStateVisualLayers.Base" ]
       state: alive
-    - state: unshaded
-      shader: unshaded
   - type: Physics
   - type: Fixtures
     fixtures:
