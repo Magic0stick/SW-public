@@ -207,7 +207,7 @@ public sealed class CultCastSystem : EntitySystem
                         // Проверяем, что предмет в руке — это именно книга-прототип (MedievalBookCultGuide)
                         if (!_entityManager.GetComponent<MetaDataComponent>(heldItem.Value).EntityPrototype?.ID.Equals("MedievalBookCultGuide") == true)
                         {
-                            _popupSystem.PopupEntity("В руке должно быть святое писание! а не "+ heldItem+"  "+_entityManager.GetComponent<MetaDataComponent>(heldItem.Value).EntityPrototype?.Name, uid, uid);
+                            _popupSystem.PopupEntity("В руке должно быть святое писание! а не " + _entityManager.GetComponent<MetaDataComponent>(heldItem.Value).EntityPrototype?.Name, uid, uid);
                             break;
                         }
 
@@ -221,6 +221,7 @@ public sealed class CultCastSystem : EntitySystem
                     else
                     {
                         _popupSystem.PopupEntity("В руке должно быть святое писание!", uid, uid);
+
                     }
                     break;
                 }
