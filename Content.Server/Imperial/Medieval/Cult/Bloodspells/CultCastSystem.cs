@@ -8,9 +8,13 @@ using Content.Shared.Popups;
 using Robust.Shared.Timing;
 using System.Linq;
 using System.Numerics;
+using Content.Server.Chemistry.Containers.EntitySystems;
 using Content.Server.Hands.Systems;
 using Content.Server.Imperial.Medieval.Cult.Bloodspells.light;
 using Content.Shared.Alert;
+using Content.Shared.Chemistry.Components;
+using Content.Shared.Chemistry.Components.SolutionManager;
+using Content.Shared.Chemistry.EntitySystems;
 using Content.Shared.Damage;
 using Content.Shared.Imperial.Medieval.Cult;
 using Content.Shared.Interaction.Events;
@@ -32,6 +36,7 @@ public sealed class CultCastSystem : EntitySystem
     [Dependency] private readonly InventorySystem _inventorySystem = default!;
     [Dependency] private readonly IEntityManager _entityManager = default!;
     [Dependency] private readonly AlertsSystem _alert = default!;
+    [Dependency] private readonly SharedSolutionContainerSystem _solution = default!;
 
     /// <inheritdoc/>
     public override void Initialize()
@@ -371,6 +376,12 @@ public sealed class CultCastSystem : EntitySystem
                     {
                         _popupSystem.PopupEntity("Ты чуствуешь, что проклятье сильно", uid, uid);
                     }
+                    break;
+                }
+                case "Zuruck":
+                {
+                    if (TryComp<SolutionComponent>(uid, out var solution))
+                        _solution.RemoveReagent((solution.Owner, solution), "Blood", 200);
                     break;
                 }
                 default:
