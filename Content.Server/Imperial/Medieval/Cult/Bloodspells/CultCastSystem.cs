@@ -37,6 +37,7 @@ public sealed class CultCastSystem : EntitySystem
     [Dependency] private readonly IEntityManager _entityManager = default!;
     [Dependency] private readonly AlertsSystem _alert = default!;
     [Dependency] private readonly SharedSolutionContainerSystem _solution = default!;
+    [Dependency] private readonly SharedTransformSystem _transform = default!;
 
     /// <inheritdoc/>
     public override void Initialize()
@@ -170,6 +171,7 @@ public sealed class CultCastSystem : EntitySystem
             {"Ave", "The", "Sekir"},
             {"Ave", "The", "Magical"},
             {"Katariemai", "Opoion", "Me chtypisei"},
+            {"Bringt", "Mi", "Zuruk"},
             // {"Дебагус", "Магикус", "Призывус"}
             // {"Elderberry", "Fig", "Banana"}
         };
@@ -378,10 +380,35 @@ public sealed class CultCastSystem : EntitySystem
                     }
                     break;
                 }
-                case "Zuruck":
+                case "Zuruk":
                 {
-                    if (TryComp<SolutionComponent>(uid, out var solution))
-                        _solution.RemoveReagent((solution.Owner, solution), "Blood", 200);
+                    if (TryComp<SolutionContainerManagerComponent>(uid, out var solutionComp))
+                    {
+                        if (_solution.TryGetSolution(uid, "bloodstream", out var bloodSolution))
+                        {
+                            if (bloodSolution.Value.Comp.Solution.Volume >
+                                bloodSolution.Value.Comp.Solution.MaxVolume * 0.6f)
+                            {
+
+                                _solution.RemoveEachReagent((uid, bloodSolution), bloodSolution.Value.Comp.Solution.MaxVolume * 0.6f);
+                                var txform = Transform(uid);
+                                var tcoords = txform.Coordinates;
+                                Spawn("MedievalTeleportZuruk", tcoords);
+                                var ouraltar = EnsureComp<CultTeleportedComponent>(uid).Portal;
+                                if (TryComp<CultTeleportComponent>(ouraltar, out var teleported) && teleported.Base)
+                                    _transform.SetCoordinates(uid, Transform(ouraltar).Coordinates);
+                                else
+                                {
+                                    _popupSystem.PopupEntity("Ты чуствуешь что тебе некуда вернутся, надо телепортироватся куда то сначало.", uid, uid);
+                                }
+                            }
+
+                            else
+                            {
+                                _popupSystem.PopupEntity("У тебя не достаточно крови", uid, uid);
+                            }
+                        }
+                    }
                     break;
                 }
                 default:

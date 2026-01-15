@@ -138,10 +138,3 @@
       tags:
         - CultConductorRod
     - type: BloodMaterial
-
-- type: entity
-  id: CultCraftAnimate
-  components:
-    - type: Sprite
-      sprite: Imperial/Medieval/Cult/animations/craft.rsi
-      state: main

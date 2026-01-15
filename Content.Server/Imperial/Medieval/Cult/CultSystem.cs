@@ -381,8 +381,8 @@ namespace Content.Server.Cult
 
                                         //if (!isDead) Spawn("MedievalCultCrystallRed", acoords);
                                         if (isDead && TryComp<SSDFreeComponent>(victim, out var ssdfreeComp) && _playerManager.TryGetSessionByEntity(victim, out var session)) _ssdFreeSystem.GoToSSD(victim, session.UserId, false, ssdfreeComp);
-                                        if (!isDead)
-                                            _adminLog.Add(LogType.Action, LogImpact.Low, $"Кристал {Spawn("MedievalCultCrystallRed", acoords)} призван от привязки {blood.Owner} {ToPrettyString(altar.Owner):altar}");
+                                        // if (!isDead)
+                                        //     _adminLog.Add(LogType.Action, LogImpact.Low, $"Кристал {Spawn("MedievalCultCrystallRed", acoords)} призван от привязки {blood.Owner} {ToPrettyString(altar.Owner):altar}");
                                     }
                                     _audioSystem.PlayPvs(comp.SuccesSound, uid);
 
