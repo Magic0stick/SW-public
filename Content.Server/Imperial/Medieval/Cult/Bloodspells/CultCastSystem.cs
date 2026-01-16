@@ -123,6 +123,27 @@ public sealed class CultCastSystem : EntitySystem
         return messages.Zip(rowSequence, (msg, seq) => msg.Equals(seq, StringComparison.OrdinalIgnoreCase)).All(match => match);
     }
 
+    private bool TryBlood(EntityUid uid, float count)
+    {
+        if (!TryComp<SolutionContainerManagerComponent>(uid, out var solutionComp))
+            return false;
+
+
+        if (!_solution.TryGetSolution(uid, "bloodstream", out var bloodSolution))
+            return false;
+
+        if (bloodSolution.Value.Comp.Solution.Volume <
+            bloodSolution.Value.Comp.Solution.MaxVolume * count)
+        {
+            _popupSystem.PopupEntity("У тебя не достаточно крови", uid, uid);
+            return false;
+        }
+
+        _solution.RemoveEachReagent((uid, bloodSolution),
+                        bloodSolution.Value.Comp.Solution.MaxVolume * count);
+        return true;
+    }
+
     private bool CheckTime(Queue<(string message, TimeSpan time)> lastSpokenMessages , EntityUid uid)
     {
         if (lastSpokenMessages.Count == 0)
@@ -382,32 +403,17 @@ public sealed class CultCastSystem : EntitySystem
                 }
                 case "Zuruk":
                 {
-                    if (TryComp<SolutionContainerManagerComponent>(uid, out var solutionComp))
+                    if (!TryBlood(uid, 0.6f))
+                        return;
+                    var txform = Transform(uid);
+                    var tcoords = txform.Coordinates;
+                    Spawn("MedievalTeleportZuruk", tcoords);
+                    var ouraltar = EnsureComp<CultTeleportedComponent>(uid).Portal;
+                    if (TryComp<CultTeleportComponent>(ouraltar, out var teleported) && teleported.Base)
+                        _transform.SetCoordinates(uid, Transform(ouraltar).Coordinates);
+                    else
                     {
-                        if (_solution.TryGetSolution(uid, "bloodstream", out var bloodSolution))
-                        {
-                            if (bloodSolution.Value.Comp.Solution.Volume >
-                                bloodSolution.Value.Comp.Solution.MaxVolume * 0.6f)
-                            {
-
-                                _solution.RemoveEachReagent((uid, bloodSolution), bloodSolution.Value.Comp.Solution.MaxVolume * 0.6f);
-                                var txform = Transform(uid);
-                                var tcoords = txform.Coordinates;
-                                Spawn("MedievalTeleportZuruk", tcoords);
-                                var ouraltar = EnsureComp<CultTeleportedComponent>(uid).Portal;
-                                if (TryComp<CultTeleportComponent>(ouraltar, out var teleported) && teleported.Base)
-                                    _transform.SetCoordinates(uid, Transform(ouraltar).Coordinates);
-                                else
-                                {
-                                    _popupSystem.PopupEntity("Ты чуствуешь что тебе некуда вернутся, надо телепортироватся куда то сначало.", uid, uid);
-                                }
-                            }
-
-                            else
-                            {
-                                _popupSystem.PopupEntity("У тебя не достаточно крови", uid, uid);
-                            }
-                        }
+                        _popupSystem.PopupEntity("Ты чуствуешь что тебе некуда вернутся, надо телепортироватся куда то сначало.", uid, uid);
                     }
                     break;
                 }
