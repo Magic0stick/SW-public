@@ -18,6 +18,6 @@ public sealed partial class TatooPrototype : IPrototype
     [DataField]
     public int Tier;
 
-    [DataField]
-    public Dictionary<string, BasePlagueEffect> Effects = new();
+    // [DataField]
+    // public Dictionary<string, BasePlagueEffect> Effects = new();
 }
