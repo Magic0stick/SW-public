@@ -10,7 +10,16 @@ using Content.Shared.Body.Components;
 using Content.Shared.Inventory;
 using Content.Shared.Popups;
 using Content.Shared.Stacks;
+using Robust.Shared.Timing;
+using System.Linq;
+using System.Numerics;
+using Content.Server.Chemistry.Containers.EntitySystems;
+using Content.Server.Hands.Systems;
+using Content.Server.Imperial.Medieval.Cult.Bloodspells.light;
 using Content.Shared.Alert;
+using Content.Shared.Chemistry.Components;
+using Content.Shared.Chemistry.Components.SolutionManager;
+using Content.Shared.Chemistry.EntitySystems;
 using Content.Shared.Damage;
 using Content.Shared.Imperial.Medieval.Cult;
 using Content.Shared.Interaction.Events;
@@ -41,6 +50,8 @@ public sealed class CultCastSystem : EntitySystem
     private const int DeathCurseCountDivisor = 2;
 
     private List<BloodSpellPrototype> _bloodSpells = new();
+    [Dependency] private readonly SharedSolutionContainerSystem _solution = default!;
+    [Dependency] private readonly SharedTransformSystem _transform = default!;
 
     public override void Initialize()
     {
@@ -152,6 +163,28 @@ public sealed class CultCastSystem : EntitySystem
     }
 
     private void OnSpoke(EntityUid uid, CultMemberComponent component, EntitySpokeEvent args)
+    private bool TryBlood(EntityUid uid, float count)
+    {
+        if (!TryComp<SolutionContainerManagerComponent>(uid, out var solutionComp))
+            return false;
+
+
+        if (!_solution.TryGetSolution(uid, "bloodstream", out var bloodSolution))
+            return false;
+
+        if (bloodSolution.Value.Comp.Solution.Volume <
+            bloodSolution.Value.Comp.Solution.MaxVolume * count)
+        {
+            _popupSystem.PopupEntity("У тебя не достаточно крови", uid, uid);
+            return false;
+        }
+
+        _solution.RemoveEachReagent((uid, bloodSolution),
+                        bloodSolution.Value.Comp.Solution.MaxVolume * count);
+        return true;
+    }
+
+    private bool CheckTime(Queue<(string message, TimeSpan time)> lastSpokenMessages , EntityUid uid)
     {
         if (component.LastSpokenMessages.Count >= MaxStoredMessages)
             component.LastSpokenMessages.Dequeue();
@@ -249,6 +282,19 @@ public sealed class CultCastSystem : EntitySystem
         }
 
         if (isArmor && spell.ReplaceEquipment)
+            {"Ave", "The", "Truth"},
+            {"Ave", "The", "Bronus"},
+            {"Ave", "The", "Vilkus"},
+            {"Ave", "The", "Knatus"},
+            {"Ave", "The", "Sekir"},
+            {"Ave", "The", "Magical"},
+            {"Katariemai", "Opoion", "Me chtypisei"},
+            {"Bringt", "Mi", "Zuruk"},
+            // {"Дебагус", "Магикус", "Призывус"}
+            // {"Elderberry", "Fig", "Banana"}
+        };
+
+        for (int i = bloodcasts.GetLength(0)-1; i >= 0; i--)
         {
             if (spell.EquipmentSlot == null ||
                 !TryComp<InventoryComponent>(caster, out var inventory) || 
@@ -323,6 +369,216 @@ public sealed class CultCastSystem : EntitySystem
             else
             {
                 _stack.SetCount(entity, stack.Count - takeCount, stack);
+                case "Призывус":
+                {
+                    var center = Transform(uid).Coordinates;
+                    for (int x = -4; x <= 5; x++)
+                    {
+                        for (int y = -4; y <= 5; y++)
+                        {
+                            var b = Spawn("MedievalCultBrushFine", center.Offset(new Vector2(x*0.5f, y*-0.5f)));
+                            if (!TryComp<CultBloodPaintComponent>(b, out var bloodPaint))
+                                break;
+                            bloodPaint.PosX = x+5;
+                            bloodPaint.PosY = y+5;
+                        }
+                    }
+                    break;
+                }
+
+
+               case "Truth":
+                {
+                    if (_handsSystem.TryGetActiveItem(uid, out var heldItem))
+                    {
+                        // Проверяем, что предмет в руке — это именно книга-прототип (MedievalBookCultGuide)
+                        if (!_entityManager.GetComponent<MetaDataComponent>(heldItem.Value).EntityPrototype?.ID.Equals("MedievalBookCultGuide") == true)
+                        {
+                            _popupSystem.PopupEntity("В руке должно быть святое писание! а не " + _entityManager.GetComponent<MetaDataComponent>(heldItem.Value).EntityPrototype?.Name, uid, uid);
+                            break;
+                        }
+
+                        // Удаляем текущий предмет в руке
+                        _entityManager.DeleteEntity(heldItem.Value);
+
+                        // Спавним новую книгу и экипируем её
+                        var newBook = Spawn("MedievalBookCultGuide2", Transform(uid).Coordinates);
+                        _handsSystem.TryPickup(uid, newBook, checkActionBlocker: false);
+                    }
+                    else
+                    {
+                        _popupSystem.PopupEntity("В руке должно быть святое писание!", uid, uid);
+
+                    }
+                    break;
+                }
+
+
+                case "Bronus":
+                {
+                    var needCount = 5;
+                    var myMaterials = new List<EntityUid>{};
+                    foreach (var target in _lookup.GetEntitiesInRange(uid, 1f))
+                    {
+                        if (TryComp<BloodMaterialComponent>(target, out var bloodMaterial) && bloodMaterial.MaterialType == "BloodIron")
+                        {
+                            myMaterials.Add(target);
+                            needCount--;
+                            if (needCount == 0)
+                            {
+                                if (TryComp<InventoryComponent>(uid, out var inventory) && _inventorySystem.TryGetSlotEntity(uid, "outerClothing", out var existingOutfit))
+                                {
+                                    foreach (var material in myMaterials)
+                                    {
+                                        _entityManager.DeleteEntity(material);
+                                    }
+                                    _entityManager.DeleteEntity(existingOutfit.Value);
+                                    var b = Spawn("MedievalClothingOuterArmorCultUp", Transform(uid).Coordinates);
+                                    _inventorySystem.TryEquip(uid, b, "outerClothing", silent: true, force: true, inventory: inventory);
+                                    return;
+                                }
+
+                            }
+                        }
+                    }
+                    _popupSystem.PopupEntity("Ресурсов не достаточно", uid, uid);
+                    break;
+                }
+                case "Vilkus":
+                {
+                    var needCount = 5;
+                    var myMaterials = new List<EntityUid>{};
+                    foreach (var target in _lookup.GetEntitiesInRange(uid, 1f))
+                    {
+                        if (TryComp<BloodMaterialComponent>(target, out var bloodMaterial) && bloodMaterial.MaterialType == "BloodIron")
+                        {
+                            myMaterials.Add(target);
+                            needCount--;
+                            if (needCount == 0)
+                            {
+                                foreach (var material in myMaterials)
+                                {
+                                    _entityManager.DeleteEntity(material);
+                                }
+                                Spawn("MedievalSpearCult", Transform(uid).Coordinates);
+                                return;
+                            }
+                        }
+                    }
+                    _popupSystem.PopupEntity("Ресурсов не достаточно", uid, uid);
+                    break;
+                }
+                case "Knatus":
+                {
+                    var needCount = 5;
+                    var myMaterials = new List<EntityUid>{};
+                    foreach (var target in _lookup.GetEntitiesInRange(uid, 1f))
+                    {
+                        if (TryComp<BloodMaterialComponent>(target, out var bloodMaterial) && bloodMaterial.MaterialType == "BloodIron")
+                        {
+                            myMaterials.Add(target);
+                            needCount--;
+                            if (needCount == 0)
+                            {
+                                foreach (var material in myMaterials)
+                                {
+                                    _entityManager.DeleteEntity(material);
+                                }
+                                Spawn("MedievalCultYatagan", Transform(uid).Coordinates);
+                                return;
+                            }
+                        }
+                    }
+                    _popupSystem.PopupEntity("Ресурсов не достаточно", uid, uid);
+                    break;
+                }
+                case "Sekir":
+                {
+                    var needCount = 5;
+                    var myMaterials = new List<EntityUid>{};
+                    foreach (var target in _lookup.GetEntitiesInRange(uid, 1f))
+                    {
+                        if (TryComp<BloodMaterialComponent>(target, out var bloodMaterial) && bloodMaterial.MaterialType == "BloodIron")
+                        {
+                            myMaterials.Add(target);
+                            needCount--;
+                            if (needCount == 0)
+                            {
+                                foreach (var material in myMaterials)
+                                {
+                                    _entityManager.DeleteEntity(material);
+                                }
+                                Spawn("MedievalIronSekirCult", Transform(uid).Coordinates);
+                                return;
+                            }
+                        }
+                    }
+                    _popupSystem.PopupEntity("Ресурсов не достаточно", uid, uid);
+                    break;
+                }
+                case "Magical":
+                {
+                    var needCount = 5;
+                    var myMaterials = new List<EntityUid>{};
+                    foreach (var target in _lookup.GetEntitiesInRange(uid, 1f))
+                    {
+                        if (TryComp<BloodMaterialComponent>(target, out var bloodMaterial) && bloodMaterial.MaterialType == "BloodLeather")
+                        {
+                            myMaterials.Add(target);
+                            needCount--;
+                            if (needCount == 0)
+                            {
+                                if (TryComp<InventoryComponent>(uid, out var inventory) && _inventorySystem.TryGetSlotEntity(uid, "outerClothing", out var existingOutfit))
+                                {
+                                    foreach (var material in myMaterials)
+                                    {
+                                        _entityManager.DeleteEntity(material);
+                                    }
+                                    _entityManager.DeleteEntity(existingOutfit.Value);
+                                    var b = Spawn("MedievalClothingOuterArmorCultMana", Transform(uid).Coordinates);
+                                    _inventorySystem.TryEquip(uid, b, "outerClothing", silent: true, force: true, inventory: inventory);
+                                    return;
+                                }
+
+                            }
+                        }
+                    }
+                    _popupSystem.PopupEntity("Ресурсов не достаточно", uid, uid);
+                    break;
+                }
+                case "Me chtypisei":
+                {
+                    if (!component.DeathCusre)
+                    {
+                        component.DeathCusre = true;
+                        _popupSystem.PopupEntity("Да будет проклят тот, кто меня ударит", uid, uid);
+                        _alert.ShowAlert(uid, component.DeathCurseAlert);
+                    }
+                    else
+                    {
+                        _popupSystem.PopupEntity("Ты чуствуешь, что проклятье сильно", uid, uid);
+                    }
+                    break;
+                }
+                case "Zuruk":
+                {
+                    if (!TryBlood(uid, 0.6f))
+                        return;
+                    var txform = Transform(uid);
+                    var tcoords = txform.Coordinates;
+                    Spawn("MedievalTeleportZuruk", tcoords);
+                    var ouraltar = EnsureComp<CultTeleportedComponent>(uid).Portal;
+                    if (TryComp<CultTeleportComponent>(ouraltar, out var teleported) && teleported.Base)
+                        _transform.SetCoordinates(uid, Transform(ouraltar).Coordinates);
+                    else
+                    {
+                        _popupSystem.PopupEntity("Ты чуствуешь что тебе некуда вернутся, надо телепортироватся куда то сначало.", uid, uid);
+                    }
+                    break;
+                }
+                default:
+                    _popupSystem.PopupEntity("Ты чуствуешь неправильность в своих словах", uid, uid);
+                    break;
             }
         }
     }

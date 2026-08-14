@@ -1,0 +1,26 @@
+- type: entity
+  id: MedievalTeleportZuruk
+  components:
+  - type: TimedDespawn
+    lifetime: 1.25
+  - type: Sprite
+    sprite: Imperial/Medieval/Cult/animations/teleport.rsi
+    state: zuruk
+  - type: TriggerOnSpawn
+  - type: EmitSoundOnSpawn
+    sound:
+      path: /Audio/Imperial/Medieval/Teleport_app.ogg
+
+- type: entity
+  id: MedievalCultCraftAnimate
+  components:
+  - type: Sprite
+    sprite: Imperial/Medieval/Cult/animations/craft.rsi
+    state: main
+  - type: TimedDespawn
+    lifetime: 2
+  # - type: TriggerOnSpawn
+  # - type: EmitSoundOnSpawn
+  #   sound:
+  #     path: /Audio/Imperial/Medieval/Teleport_app.ogg
+
