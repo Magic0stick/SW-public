@@ -489,6 +489,7 @@
   description: A deadly knife intended for melee confrontations.
   components:
   - type: CultRitualMelee
+  - type: TattooTool
   - type: Sprite
     sprite: Imperial/Medieval/Melee/dagger_cult.rsi
     size: Small
@@ -596,7 +597,7 @@
       layers:
         - state: book
     - type: GuideHelp
-      guides: 
+      guides:
       - MedievalCultMainRules
       openOnActivation: true
     - type: Currency

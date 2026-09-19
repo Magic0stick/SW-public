@@ -14,6 +14,8 @@ using Content.Shared.Alert;
 using Content.Shared.Damage;
 using Content.Shared.Imperial.Medieval.Cult;
 using Content.Shared.Interaction.Events;
+using Content.Shared.Mind;
+using Content.Shared.Mind.Components;
 using Content.Shared.Weapons.Melee.Events;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Timing;
@@ -70,6 +72,9 @@ public sealed class CultCastSystem : EntitySystem
         if (TryComp<CultCursedComponent>(attacker, out var cursed) && cursed.CurseLevel != 0)
             return;
 
+        if (!HasComp<MindContainerComponent>(attacker))
+            return;
+
         ApplyOrIncreaseCurse(attacker);
         RemoveDeathCurse(uid, component);
     }
@@ -120,7 +125,7 @@ public sealed class CultCastSystem : EntitySystem
 
         var recentMessages = queue.Reverse().Take(sequenceLength).Reverse().Select(item => item.message).ToArray();
 
-        return recentMessages.Zip(spell.Incantation, (msg, spellWord) => 
+        return recentMessages.Zip(spell.Incantation, (msg, spellWord) =>
             msg.Equals(spellWord, StringComparison.OrdinalIgnoreCase)).All(match => match);
     }
 
@@ -251,7 +256,7 @@ public sealed class CultCastSystem : EntitySystem
         if (isArmor && spell.ReplaceEquipment)
         {
             if (spell.EquipmentSlot == null ||
-                !TryComp<InventoryComponent>(caster, out var inventory) || 
+                !TryComp<InventoryComponent>(caster, out var inventory) ||
                 !_inventorySystem.TryGetSlotEntity(caster, spell.EquipmentSlot, out var existingOutfit))
             {
                 var failMsg = spell.FailureMessage ?? "cult-spell-insufficient-materials";
@@ -288,7 +293,7 @@ public sealed class CultCastSystem : EntitySystem
 
         var sortedEntities = entities.OrderByDescending(e => {
             int count = TryComp<StackComponent>(e, out var stack) ? stack.Count : 1;
-            return count >= requiredCount ? int.MaxValue : count; 
+            return count >= requiredCount ? int.MaxValue : count;
         }).ThenByDescending(e => _stack.GetCount(e));
 
         foreach (var entity in sortedEntities)
