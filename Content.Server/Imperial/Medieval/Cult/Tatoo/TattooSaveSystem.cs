@@ -1,34 +1,65 @@
-using Robust.Shared;
+using Robust.Shared.GameObjects;
+using Robust.Shared.IoC;
+using Robust.Shared.Log;
+using Robust.Shared.Maths;
 using Content.Shared.Imperial.Medieval.Cult.Tatoo;
-using Content.Server.Cult.Components;
+using Content.Shared.Interaction; // Для проверки дистанции взаимодействия
 
 namespace Content.Server.Imperial.Medieval.Cult.Tatoo;
 
 public sealed class TattooSaveSystem : EntitySystem
 {
+    [Dependency] private readonly SharedInteractionSystem _interactionSystem = default!;
+
     public override void Initialize()
     {
         base.Initialize();
+
+        // В Robust сервер подписывается на сетевые сообщения систем через SubscribeNetworkEvent
+        SubscribeNetworkEvent<SubmitTattooCircuitMessage>(OnSaveTattoo);
     }
 
-    public void SaveTattoo(EntityUid user, SubmitTattooCircuitMessage message)
+    private void OnSaveTattoo(SubmitTattooCircuitMessage message, EntitySessionEventArgs args)
     {
-        if (!EntityManager.HasComponent<CultMemberComponent>(user)) return;
+        Log.Info($"[TattooDebug] Received SubmitTattooCircuitMessage. Target NetEntity: {message.Target}");
 
-        // Конвертируем NetEntity обратно в EntityUid
-        EntityUid targetUid = EntityManager.GetEntity(message.Target);
-        if (targetUid == EntityUid.Invalid) return;
-        if (targetUid == user) return;
-
-        EntityManager.EnsureComponent<TattooComponent>(targetUid, out var tattooComp);
-
-        var circuit = new TattooCircuit
+        // 1. Проверяем, существует ли сессия игрока и его персонаж на сервере
+        if (args.SenderSession.AttachedEntity is not { } userUid)
         {
-            Connections = message.Connections,
-            DrawingMask = System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(message.DrawingData))
-        };
+            Log.Warning("[TattooDebug] Network message received from a session with no attached entity.");
+            return;
+        }
 
-        tattooComp.Circuits.Clear();
-        tattooComp.Circuits.Add(circuit);
+        // 2. Безопасно резолвим цель
+        if (!TryGetEntity(message.Target, out var targetUid))
+        {
+            Log.Warning($"[TattooDebug] Failed to resolve NetEntity {message.Target} to local EntityUid");
+            return;
+        }
+
+        // 3. ЗАЩИТА ОТ ЧИТОВ: Проверяем, находится ли рисовальщик достаточно близко к цели
+        // Задаем стандартную дистанцию клика (InRangeUnobstructed проверяет стены/окна на пути)
+        if (!_interactionSystem.InRangeUnobstructed(userUid, targetUid.Value, range: SharedInteractionSystem.InteractionRange))
+        {
+            Log.Warning($"[TattooDebug] Player {userUid} tried to tattoo {targetUid} out of range!");
+            return;
+        }
+
+        Log.Info($"[TattooDebug] Saving tattoo for target: {targetUid}. Pixels count: {message.Pixels.Count}");
+
+        // 4. Получаем или создаем компонент татуировки на цели
+        var tattooComp = EnsureComp<TattooComponent>(targetUid.Value);
+
+        // 5. Перезаписываем данные. Никакого JSON! Сохраняем напрямую сетку точек.
+        // Подразумевается, что класс TattooComponent в Shared/Server содержит поле:
+        // public List<Vector2i> TattooPixels = new();
+        tattooComp.TattooPixels.Clear();
+        tattooComp.TattooPixels.AddRange(message.Pixels);
+
+        // Маркируем компонент как "измененный", чтобы Robust синхронизировал изменения,
+        // если компонент имеет флаг [NetworkedComponent]
+        Dirty(targetUid.Value, tattooComp);
+
+        Log.Info($"[TattooDebug] Tattoo successfully saved to entity {targetUid}");
     }
 }

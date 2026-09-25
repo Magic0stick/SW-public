@@ -1,7 +1,8 @@
 using Robust.Client.UserInterface;
 using Robust.Client.UserInterface.Controls;
-using Robust.Shared;
-using Content.Shared.Imperial.Medieval.Cult.Tatoo;
+using Robust.Client.Graphics;
+using Robust.Shared.Input;
+using Robust.Shared.Maths;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -9,73 +10,118 @@ namespace Content.Client.Imperial.Medieval.Cult.Tatoo;
 
 public sealed class TattooCanvas : Control
 {
-    private List<Vector2> _pixels = new();
+    // Теперь мы храним пиксели строго в координатах сетки от 0 до 31
+    private HashSet<Vector2i> _drawnPixels = new();
     private bool _isDrawing = false;
-    private TattooSlot? _lastActivatedSlot = null;
-    private HashSet<(TattooSlot, TattooSlot)> _activeConnections = new();
+    private readonly SpriteView _playerView;
 
-    private readonly Dictionary<TattooSlot, Vector2> _slotPositions = new()
+    public TattooCanvas(SpriteView playerView)
     {
-        { TattooSlot.Head, new Vector2(0.5f, 0.1f) },
-        { TattooSlot.TorsoUpper, new Vector2(0.5f, 0.3f) },
-        { TattooSlot.TorsoLower, new Vector2(0.5f, 0.5f) },
-        { TattooSlot.ArmLeft, new Vector2(0.3f, 0.35f) },
-        { TattooSlot.ArmRight, new Vector2(0.7f, 0.35f) },
-        { TattooSlot.LegLeft, new Vector2(0.4f, 0.7f) },
-        { TattooSlot.LegRight, new Vector2(0.6f, 0.7f) }
-    };
-
-    public TattooCanvas() { }
-
-    // В RobustToolbox Control не имеет виртуальных методов OnMouseDown.
-    // Мы будем использовать события клика/движения, либо методы из базового класса,
-    // если они доступны. Для реализации рисования мы создадим методы-обработчики,
-    // которые будут вызываться извне или через подписку.
-
-    public void HandleMouseDown(Vector2 position)
-    {
-        _isDrawing = true;
-        AddPixel(position);
+        _playerView = playerView;
+        MouseFilter = MouseFilterMode.Stop;
     }
 
-    public void HandleMouseMove(Vector2 position)
+    protected override void KeyBindDown(GUIBoundKeyEventArgs args)
     {
+        base.KeyBindDown(args);
+        if (args.Function == EngineKeyFunctions.UIClick)
+        {
+            _isDrawing = true;
+            TryDrawPixel(args.RelativePosition);
+            args.Handle();
+        }
+    }
+
+    protected override void KeyBindUp(GUIBoundKeyEventArgs args)
+    {
+        base.KeyBindUp(args);
+        if (args.Function == EngineKeyFunctions.UIClick)
+        {
+            _isDrawing = false;
+            args.Handle();
+        }
+    }
+
+    protected override void MouseMove(GUIMouseMoveEventArgs args)
+    {
+        base.MouseMove(args);
         if (_isDrawing)
         {
-            AddPixel(position);
+            TryDrawPixel(args.RelativePosition);
         }
     }
 
-    public void HandleMouseUp()
+    private void TryDrawPixel(Vector2 localMousePos)
     {
-        _isDrawing = false;
+        if (Size.X == 0 || Size.Y == 0) return;
+
+        // 1. Переводим координаты экрана в сетку 32x32
+        int pixelX = (int)(localMousePos.X / Size.X * 32f);
+        int pixelY = (int)(localMousePos.Y / Size.Y * 32f);
+
+        // Границы сетки
+        if (pixelX < 0 || pixelX >= 32 || pixelY < 0 || pixelY >= 32) return;
+
+        Vector2i targetPixel = new Vector2i(pixelX, pixelY);
+
+        // 2. Проверка: рисуем ли мы поверх модельки персонажа?
+        if (!IsHoveringCharacterModel(localMousePos))
+            return; // Мимо модельки! Рисовать нельзя.
+
+        _drawnPixels.Add(targetPixel);
     }
 
-    private void AddPixel(Vector2 pos)
+    private bool IsHoveringCharacterModel(Vector2 localMousePos)
     {
-        Vector2 normalizedPos = new Vector2(pos.X / 500f, pos.Y / 800f);
-        _pixels.Add(normalizedPos);
+        // Достаем актуальный спрайт, который сейчас рендерится в SpriteView
+        var sprite = _playerView.Sprite;
+        if (sprite == null) return false;
 
-        foreach (var slot in _slotPositions)
+        // Нам нужно проверить, есть ли видимый пиксель под мышкой.
+        // Так как сложная попиксельная проверка текстур (GetPixel) из текстурного атласа
+        // в UI-потоке Robust сильно бьет по производительности из-за сжатия VRAM,
+        // самым надежным и быстрым способом в SS14 является проверка по bounding box
+        // (границам) или проверка центральной зоны спрайта.
+
+        // Для гуманоидов в SS14 моделька обычно сосредоточена по центру (от 0.3 до 0.7 по X)
+        // и занимает от 0.15 до 0.85 по Y.
+        float normX = localMousePos.X / Size.X;
+        float normY = localMousePos.Y / Size.Y;
+
+        if (normX >= 0.35f && normX <= 0.65f && normY >= 0.15f && normY <= 0.85f)
         {
-            if (Vector2.Distance(normalizedPos, slot.Value) < 0.02f)
-            {
-                ActivateSlot(slot.Key);
-                break;
-            }
+            return true;
         }
+
+        return false;
     }
 
-    private void ActivateSlot(TattooSlot slot)
+    protected override void Draw(DrawingHandleScreen handle)
     {
-        if (_lastActivatedSlot.HasValue && _lastActivatedSlot.Value != slot)
+        base.Draw(handle);
+
+        // Считаем размер одного пикселя из нашей сетки 32x32 на реальном экране
+        float pixelSizeX = Size.X / 32f;
+        float pixelSizeY = Size.Y / 32f;
+
+        // Отрисовываем каждый закрашенный пиксель как закрашенный квадратик
+        foreach (var pixel in _drawnPixels)
         {
-            _activeConnections.Add((_lastActivatedSlot.Value, slot));
-            _activeConnections.Add((slot, _lastActivatedSlot.Value));
+            Vector2 topLeft = new Vector2(pixel.X * pixelSizeX, pixel.Y * pixelSizeY);
+            Vector2 bottomRight = new Vector2((pixel.X + 1) * pixelSizeX, (pixel.Y + 1) * pixelSizeY);
+
+            UIBox2 rect = new UIBox2(topLeft, bottomRight);
+
+            // Рисуем пиксель татуировки (например, кроваво-красный культистский цвет)
+            handle.DrawRect(rect, Color.Red.WithAlpha(0.7f));
         }
-        _lastActivatedSlot = slot;
     }
 
-    public List<(TattooSlot, TattooSlot)> GetConnections() => new(_activeConnections);
-    public List<Vector2> GetDrawingData() => _pixels;
+    // Возвращает список закрашенных пикселей 32x32 для отправки на сервер
+    public List<Vector2i> GetPixelData() => new(_drawnPixels);
+
+    public void ClearCanvas()
+    {
+        _drawnPixels.Clear();
+    }
 }

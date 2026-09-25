@@ -4,8 +4,9 @@ using Robust.Shared.Prototypes;
 using System.Collections.Generic;
 using System;
 using Content.Shared.Alert;
+using Robust.Shared;
 
-namespace Content.Server.Cult.Components;
+namespace Content.Shared.Cult.Components;
 
 [RegisterComponent]
 public sealed partial class CultMemberComponent : Component

@@ -15,11 +15,13 @@ public sealed class OpenTattooWindowMessage : EntityEventArgs
 
 /// <summary>
 /// Сообщение для отправки завершенной схемы татуировки на сервер.
+/// А вы знали что магия на самом деле просто схемотехника?
 /// </summary>
-[NetSerializable, Serializable]
+[Serializable, NetSerializable]
 public sealed class SubmitTattooCircuitMessage : EntityEventArgs
 {
-    public NetEntity Target;
-    public List<TattooConnection> Connections = new();
-    public List<Vector2> DrawingData = new();
+    public NetEntity Target { get; set; }
+
+    // Передаем сетку закрашенных точек игрока
+    public List<Vector2i> Pixels { get; set; } = new();
 }

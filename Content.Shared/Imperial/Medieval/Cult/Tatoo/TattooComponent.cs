@@ -1,14 +1,16 @@
-using Robust.Shared;
+using Robust.Shared.GameObjects;
+using Robust.Shared.Maths;
+using Robust.Shared.Serialization.TypeSerializers.Implementations.Custom.Prototype;
+using System.Collections.Generic;
+using Robust.Shared.Serialization;
 
 namespace Content.Shared.Imperial.Medieval.Cult.Tatoo;
 
-/// <summary>
-/// Компонент, хранящий текущие татуировки-схемы на теле персонажа.
-/// </summary>
-[RegisterComponent]
+// [RegisterComponent] обязателен, чтобы Robust зарегистрировал его в ECS
+[NetSerializable, Serializable]
 public sealed partial class TattooComponent : Component
 {
-    // Список всех нанесенных схем.
-    // Обычно одна большая схема на все тело, но архитектурно оставим список.
-    public List<TattooCircuit> Circuits = new();
+    // Список закрашенных пикселей 32x32 на теле этого существа
+    [DataField("tattooPixels")]
+    public List<Vector2i> TattooPixels = new();
 }

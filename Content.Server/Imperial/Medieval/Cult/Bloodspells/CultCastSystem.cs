@@ -11,6 +11,7 @@ using Content.Shared.Inventory;
 using Content.Shared.Popups;
 using Content.Shared.Stacks;
 using Content.Shared.Alert;
+using Content.Shared.Cult.Components;
 using Content.Shared.Damage;
 using Content.Shared.Imperial.Medieval.Cult;
 using Content.Shared.Interaction.Events;

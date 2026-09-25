@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using Robust.Shared.Serialization;
 
 namespace Content.Shared.Imperial.Medieval.Cult.Tatoo;
 
@@ -7,6 +8,7 @@ namespace Content.Shared.Imperial.Medieval.Cult.Tatoo;
 /// Данные о кровавой схеме татуировки.
 /// Вместо простых пикселей мы храним граф связей между точками тела.
 /// </summary>
+[NetSerializable, Serializable]
 public sealed partial class TattooCircuit
 {
     // Список активных соединений между слотами.
@@ -18,7 +20,7 @@ public sealed partial class TattooCircuit
     // Хранение самого рисунка для визуализации (попиксельная маска)
     public byte[] DrawingMask = System.Array.Empty<byte>();
 }
-
+[NetSerializable, Serializable]
 public sealed partial class TattooNode
 {
     public Vector2 Position;
