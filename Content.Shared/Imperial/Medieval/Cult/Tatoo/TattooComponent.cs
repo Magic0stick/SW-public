@@ -6,8 +6,8 @@ using Robust.Shared.Serialization;
 
 namespace Content.Shared.Imperial.Medieval.Cult.Tatoo;
 
-// [RegisterComponent] обязателен, чтобы Robust зарегистрировал его в ECS
-[NetSerializable, Serializable]
+[RegisterComponent]//  обязателен, чтобы Robust зарегистрировал его в ECS
+[Serializable, NetSerializable]
 public sealed partial class TattooComponent : Component
 {
     // Список закрашенных пикселей 32x32 на теле этого существа
